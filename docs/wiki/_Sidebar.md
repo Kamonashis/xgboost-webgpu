@@ -16,5 +16,7 @@
 * [Benchmarking & Performance](Benchmarking-and-Performance-Guide)
 
 ---
+* [PyPI Package](https://pypi.org/project/xgboost-webgpu/)
+* [GitHub Repository](https://github.com/Kamonashis/xgboost-webgpu)
 * [Gitea Repository](https://tea.ergotresearch.com/Ergot-Research/xgboost-webgpu)
-* [Issues & Discussions](https://tea.ergotresearch.com/Ergot-Research/xgboost-webgpu/issues)
+* [Issues & Discussions](https://github.com/Kamonashis/xgboost-webgpu/issues)

@@ -6,17 +6,20 @@
 
 ## 1. Installation
 
-### From Source via pip
+### Install from PyPI (Recommended)
+`xgboost-webgpu` is available on [PyPI](https://pypi.org/project/xgboost-webgpu/). Install via pip:
 ```bash
-# Clone the repository
-git clone https://tea.ergotresearch.com/Ergot-Research/xgboost-webgpu.git
-cd xgboost-webgpu
+pip install xgboost-webgpu
+```
 
-# Build and install into current Python environment
+### Install from Source
+```bash
+git clone https://github.com/Kamonashis/xgboost-webgpu.git
+cd xgboost-webgpu
 pip install .
 ```
 
-### Editable Development with Maturin
+### Development with Maturin
 ```bash
 pip install maturin
 maturin develop --release

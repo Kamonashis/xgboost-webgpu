@@ -1,5 +1,8 @@
 # Welcome to the xgboost-webgpu Wiki
 
+[![PyPI version](https://img.shields.io/pypi/v/xgboost-webgpu.svg)](https://pypi.org/project/xgboost-webgpu/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **`xgboost-webgpu`** is an industrial-grade, pure-Rust implementation of the XGBoost Gradient Boosted Decision Tree (GBDT) algorithm with **universal hardware acceleration via WebGPU (`wgpu`)**.
 
 Standard XGBoost restricts GPU acceleration exclusively to NVIDIA hardware via CUDA (`device='cuda'` or `tree_method='gpu_hist'`). For practitioners on **AMD Radeon GPUs**, **Apple Silicon Macs (M1/M2/M3/M4)**, **Intel Arc GPUs**, and **web browsers**, standard XGBoost falls back to CPU execution. 
@@ -27,21 +30,21 @@ Standard XGBoost restricts GPU acceleration exclusively to NVIDIA hardware via C
 
 Explore detailed guides, mathematical foundations, and implementation details:
 
-* [Architecture & WebGPU Compute Pipeline](Architecture-and-WebGPU)
+* [Architecture & WebGPU Compute Pipeline](Architecture-and-WebGPU.md)
   * WGSL compute shader architecture, 2D workgroup dispatch, fixed-point integer atomics (`atomic<i32>`), compact 256-bin quantization, and $O(1)$ sibling histogram subtraction.
-* [Objectives & Loss Functions](Objectives-and-Loss-Functions)
+* [Objectives & Loss Functions](Objectives-and-Loss-Functions.md)
   * Full mathematical formulations, gradients, and Hessians for Regression, Logistic Binary, Softmax/Softprob Multi-Class, Poisson Count, Gamma, Tweedie, Quantile, and Pairwise Ranking.
-* [Tree Growth & Policies](Tree-Building-and-Growth-Policies)
+* [Tree Growth & Policies](Tree-Building-and-Growth-Policies.md)
   * `DepthWise` level-by-level vs. `LossGuide` leaf-wise expansion, $L_1$/$L_2$ regularization, step clamping (`max_delta_step`), row/column subsampling, and monotonic/interaction constraints.
-* [DART Booster & Early Stopping](Advanced-Boosting-and-DART)
+* [DART Booster & Early Stopping](Advanced-Boosting-and-DART.md)
   * Dropouts meet Multiple Additive Regression Trees (DART), early stopping evaluation, and model continuation.
-* [Model Interpretability & TreeSHAP](Model-Interpretability-and-TreeSHAP)
+* [Model Interpretability & TreeSHAP](Model-Interpretability-and-TreeSHAP.md)
   * Gain/Weight/Cover feature importances, exact TreeSHAP local attribution polynomial algorithm, and leaf index prediction.
-* [Rust API Reference](Rust-API-Reference)
+* [Rust API Reference](Rust-API-Reference.md)
   * Rust API guide: `DMatrix`, `BoosterParams`, `train()`, `Booster`, and official XGBoost JSON model serialization.
-* [Python Bindings & Scikit-Learn API](Python-Bindings-and-Scikit-Learn-API)
+* [Python Bindings & Scikit-Learn API](Python-Bindings-and-Scikit-Learn-API.md)
   * PyO3 Python bindings with Python Stable ABI (`abi3-py310`), drop-in `XGBRegressor`, `XGBClassifier`, and NumPy integration.
-* [Benchmarking & Performance Guide](Benchmarking-and-Performance-Guide)
+* [Benchmarking & Performance Guide](Benchmarking-and-Performance-Guide.md)
   * Performance profiling, GPU memory footprints, and multi-vendor hardware optimization tips.
 
 ---
@@ -71,6 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Python
 ```python
+# Install via: pip install xgboost-webgpu
 import numpy as np
 import xgboost_webgpu as xgb
 

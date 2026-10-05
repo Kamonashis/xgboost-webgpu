@@ -1,5 +1,9 @@
 # xgboost-webgpu
 
+[![PyPI version](https://img.shields.io/pypi/v/xgboost-webgpu.svg)](https://pypi.org/project/xgboost-webgpu/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/xgboost-webgpu.svg)](https://pypi.org/project/xgboost-webgpu/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Universal, blazing-fast, and memory-efficient XGBoost (Gradient Boosted Decision Trees) library in Rust, powered by **WebGPU** (`wgpu`) compute acceleration.
 
 Standard XGBoost only supports GPU acceleration via NVIDIA CUDA (`device='cuda'` or `tree_method='gpu_hist'`). `xgboost-webgpu` breaks this hardware lock-in, enabling hardware-accelerated model training and inference across **any modern GPU**:
@@ -129,13 +133,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Installation
 
-```bash
-# Build and install locally using pip
-pip install .
+Install directly from [PyPI](https://pypi.org/project/xgboost-webgpu/):
 
-# Or develop with maturin
-maturin develop --release
+```bash
+pip install xgboost-webgpu
 ```
+
+*(Alternatively, build from source using `pip install .` or `maturin develop --release`)*
 
 ### Scikit-Learn API Example
 
