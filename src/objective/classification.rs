@@ -1,8 +1,24 @@
 use super::Objective;
 
 /// Binary classification with logistic loss (negative log-likelihood)
-#[derive(Debug, Clone, Default)]
-pub struct BinaryLogistic;
+#[derive(Debug, Clone)]
+pub struct BinaryLogistic {
+    pub scale_pos_weight: f32,
+}
+
+impl Default for BinaryLogistic {
+    fn default() -> Self {
+        Self {
+            scale_pos_weight: 1.0,
+        }
+    }
+}
+
+impl BinaryLogistic {
+    pub fn new(scale_pos_weight: f32) -> Self {
+        Self { scale_pos_weight }
+    }
+}
 
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
@@ -28,24 +44,17 @@ impl Objective for BinaryLogistic {
         hess: &mut [f32],
     ) {
         let n = y_true.len();
-        match weights {
-            Some(w) => {
-                for i in 0..n {
-                    let weight = w[i];
-                    let p = sigmoid(y_pred[i]);
-                    grads[i] = (p - y_true[i]) * weight;
-                    let h = (p * (1.0 - p)).max(1e-16);
-                    hess[i] = h * weight;
-                }
-            }
-            None => {
-                for i in 0..n {
-                    let p = sigmoid(y_pred[i]);
-                    grads[i] = p - y_true[i];
-                    let h = (p * (1.0 - p)).max(1e-16);
-                    hess[i] = h;
-                }
-            }
+        let scale_pos = self.scale_pos_weight;
+
+        for i in 0..n {
+            let base_w = weights.map(|w| w[i]).unwrap_or(1.0);
+            let is_pos = y_true[i] > 0.5;
+            let eff_w = if is_pos { base_w * scale_pos } else { base_w };
+
+            let p = sigmoid(y_pred[i]);
+            grads[i] = (p - y_true[i]) * eff_w;
+            let h = (p * (1.0 - p)).max(1e-16);
+            hess[i] = h * eff_w;
         }
     }
 

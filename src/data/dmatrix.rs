@@ -1,4 +1,4 @@
-use crate::data::binning::FeatureBinMapper;
+use crate::data::binning::{FeatureBinMapper, FeatureType};
 use rayon::prelude::*;
 
 /// Primary dataset matrix structure for XGBoost training and inference.
@@ -14,10 +14,14 @@ pub struct DMatrix {
     pub weights: Option<Vec<f32>>,
     /// Feature names (length = ncols).
     pub feature_names: Vec<String>,
+    /// Feature types (Numerical or Categorical).
+    pub feature_types: Vec<FeatureType>,
     /// Per-feature bin mappers.
     pub bin_mappers: Vec<FeatureBinMapper>,
     /// Quantized bin values in row-major format (length = nrows * ncols, values in 0..255).
     pub binned_data: Vec<u8>,
+    /// Query group counts for ranking (e.g. sum(group) == nrows).
+    pub group: Option<Vec<usize>>,
 }
 
 impl DMatrix {
@@ -28,6 +32,18 @@ impl DMatrix {
         ncols: usize,
         labels: Option<&[f32]>,
         max_bins: usize,
+    ) -> Result<Self, String> {
+        Self::from_dense_with_types(data, nrows, ncols, labels, max_bins, None)
+    }
+
+    /// Constructs a `DMatrix` from dense data with optional explicit feature types.
+    pub fn from_dense_with_types(
+        data: &[f32],
+        nrows: usize,
+        ncols: usize,
+        labels: Option<&[f32]>,
+        max_bins: usize,
+        feature_types: Option<&[FeatureType]>,
     ) -> Result<Self, String> {
         if data.len() != nrows * ncols {
             return Err(format!(
@@ -49,6 +65,16 @@ impl DMatrix {
             }
         }
 
+        let ftypes = match feature_types {
+            Some(t) => {
+                if t.len() != ncols {
+                    return Err(format!("feature_types length must match ncols ({})", ncols));
+                }
+                t.to_vec()
+            }
+            None => vec![FeatureType::Numerical; ncols],
+        };
+
         let feature_names: Vec<String> = (0..ncols).map(|j| format!("f{j}")).collect();
 
         // Fit bin mapper for each column in parallel
@@ -56,7 +82,7 @@ impl DMatrix {
             .into_par_iter()
             .map(|j| {
                 let col_vals: Vec<f32> = (0..nrows).map(|i| data[i * ncols + j]).collect();
-                FeatureBinMapper::fit(&col_vals, max_bins)
+                FeatureBinMapper::fit_with_type(&col_vals, max_bins, ftypes[j])
             })
             .collect();
 
@@ -80,9 +106,46 @@ impl DMatrix {
             labels: labels.map(|l| l.to_vec()),
             weights: None,
             feature_names,
+            feature_types: ftypes,
             bin_mappers,
             binned_data,
+            group: None,
         })
+    }
+
+    /// Constructs a `DMatrix` from Compressed Sparse Row (CSR) format.
+    pub fn from_csr(
+        indptr: &[usize],
+        indices: &[usize],
+        values: &[f32],
+        nrows: usize,
+        ncols: usize,
+        labels: Option<&[f32]>,
+        max_bins: usize,
+    ) -> Result<Self, String> {
+        if indptr.len() != nrows + 1 {
+            return Err(format!(
+                "CSR indptr length ({}) must be nrows + 1 ({})",
+                indptr.len(),
+                nrows + 1
+            ));
+        }
+
+        let mut dense_data = vec![0.0f32; nrows * ncols];
+
+        for i in 0..nrows {
+            let start = indptr[i];
+            let end = indptr[i + 1];
+            for k in start..end {
+                let col = indices[k];
+                if col >= ncols {
+                    return Err(format!("CSR column index {} out of bounds ({})", col, ncols));
+                }
+                dense_data[i * ncols + col] = values[k];
+            }
+        }
+
+        Self::from_dense(&dense_data, nrows, ncols, labels, max_bins)
     }
 
     /// Constructs a `DMatrix` using existing bin mappers (e.g. for validation/test data).
@@ -109,6 +172,8 @@ impl DMatrix {
         }
 
         let feature_names: Vec<String> = (0..ncols).map(|j| format!("f{j}")).collect();
+        let feature_types: Vec<FeatureType> = bin_mappers.iter().map(|m| m.feature_type).collect();
+
         let mut binned_data = vec![0u8; nrows * ncols];
         binned_data
             .par_chunks_exact_mut(ncols)
@@ -128,9 +193,24 @@ impl DMatrix {
             labels: labels.map(|l| l.to_vec()),
             weights: None,
             feature_names,
+            feature_types,
             bin_mappers: bin_mappers.to_vec(),
             binned_data,
+            group: None,
         })
+    }
+
+    /// Set query groups for ranking.
+    pub fn set_group(&mut self, group: Vec<usize>) -> Result<(), String> {
+        let total: usize = group.iter().sum();
+        if total != self.nrows {
+            return Err(format!(
+                "Sum of group elements ({}) must equal nrows ({})",
+                total, self.nrows
+            ));
+        }
+        self.group = Some(group);
+        Ok(())
     }
 
     /// Set custom feature names.
@@ -177,19 +257,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_dmatrix_construction() {
-        let raw_data = vec![
-            1.0, 10.0,
-            2.0, 20.0,
-            3.0, 30.0,
-            4.0, 40.0,
-        ];
-        let labels = vec![0.0, 1.0, 0.0, 1.0];
-        let dmat = DMatrix::from_dense(&raw_data, 4, 2, Some(&labels), 4).unwrap();
+    fn test_dmatrix_csr() {
+        // 2x3 matrix:
+        // [1.0, 0.0, 2.0]
+        // [0.0, 3.0, 0.0]
+        let indptr = vec![0, 2, 3];
+        let indices = vec![0, 2, 1];
+        let values = vec![1.0, 2.0, 3.0];
+        let labels = vec![0.5, 1.5];
 
-        assert_eq!(dmat.nrows, 4);
-        assert_eq!(dmat.ncols, 2);
-        assert_eq!(dmat.binned_data.len(), 8);
-        assert_eq!(dmat.labels.as_ref().unwrap().len(), 4);
+        let dmat = DMatrix::from_csr(&indptr, &indices, &values, 2, 3, Some(&labels), 10).unwrap();
+        assert_eq!(dmat.nrows, 2);
+        assert_eq!(dmat.ncols, 3);
+        assert_eq!(dmat.get_value(0, 0), 1.0);
+        assert_eq!(dmat.get_value(0, 1), 0.0);
+        assert_eq!(dmat.get_value(0, 2), 2.0);
+        assert_eq!(dmat.get_value(1, 1), 3.0);
     }
 }

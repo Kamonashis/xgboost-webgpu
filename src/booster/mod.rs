@@ -1,5 +1,7 @@
 pub mod booster;
+pub mod importance;
 pub mod params;
 
 pub use booster::Booster;
-pub use params::{BoosterParams, DeviceType};
+pub use importance::ImportanceType;
+pub use params::{BoosterParams, BoosterType, DeviceType, GrowPolicy};

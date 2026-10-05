@@ -25,27 +25,50 @@ Standard XGBoost only supports GPU acceleration via NVIDIA CUDA (`device='cuda'`
 
 ---
 
-## Key Architectural Highlights
+## Complete Feature Matrix
 
-1. **Histogram Quantization (`DMatrix`)**:
-   - Quantizes continuous features into 256 discrete bins (`u8`), compressing feature storage by **75%** and maximizing GPU memory bandwidth.
-   - Packs 4 bins per 32-bit word for aligned, high-throughput GPU storage buffer reads.
+### 1. Objectives & Loss Functions
+- **Regression**: `reg:squarederror` (squared error loss).
+- **Binary Classification**: `binary:logistic` with `scale_pos_weight` support.
+- **Multi-Class Classification**: `multi:softprob` (probabilities) and `multi:softmax` (hard labels).
+- **Count & Deviance**: `count:poisson` (Poisson regression for count data).
+- **Dispersion Models**: `reg:gamma` (Gamma deviance) and `reg:tweedie` (compound Poisson-Gamma).
+- **Quantile Loss**: `reg:quantileerror` (pinball loss for arbitrary conditional quantiles).
+- **Ranking**: `rank:pairwise` (LambdaMART-style pairwise ranking with query groups).
 
-2. **Parallel WGSL Compute Shaders**:
-   - Dispatches 2D compute workgroups across samples and features.
-   - Fixed-point scaled atomic accumulation guarantees 100% universal hardware compatibility without requiring optional float-atomic extensions.
+### 2. Data Formats & Preprocessing
+- **Dense Data**: Row-major dense buffers (`DMatrix::from_dense`).
+- **Sparse CSR Format**: Compressed Sparse Row matrices (`DMatrix::from_csr`).
+- **Quantization**: 256 discrete bins (`u8`) for 75% memory reduction and packed 4-bins-per-u32 GPU storage buffer reads.
+- **Categorical Features**: `FeatureType::Categorical` with dedicated category indexing.
+- **Missing Value Handling**: Automatic routing according to optimal split gain (`default_left`).
 
-3. **Histogram Subtraction Trick**:
-   - For sibling nodes after a split, computes histograms only for the child with fewer samples; derives the sibling histogram in $O(1)$ child operations:
-     $$H_{\text{sibling}} = H_{\text{parent}} - H_{\text{child}}$$
-   - Halves GPU compute operations across every level of the tree.
+### 3. Tree Growth & Regularization
+- **Growth Policies**:
+  - `GrowPolicy::DepthWise`: Level-by-level recursive growth.
+  - `GrowPolicy::LossGuide`: Leaf-wise best-first growth (LightGBM style) up to `max_leaves`.
+- **Regularization**: $L_1$ (`reg_alpha`), $L_2$ (`reg_lambda`), `gamma` (min split loss), `min_child_weight`, and `max_delta_step`.
+- **Subsampling**:
+  - `subsample`: Row subsampling (bagging) per round.
+  - `colsample_bytree`: Feature subsampling per tree.
+  - `colsample_bylevel` & `colsample_bynode`: Feature subsampling per level and per split node.
+- **Constraints**:
+  - `monotone_constraints`: Enforces strict $+1$ (non-decreasing) or $-1$ (non-increasing) monotonic outputs.
+  - `interaction_constraints`: Constrains allowed feature interaction groups.
 
-4. **Official XGBoost JSON Interoperability**:
-   - Exports and loads models using the standard **XGBoost JSON model format**.
-   - Train on WebGPU in Rust, deploy anywhere (Python XGBoost, Treelite, C++, etc.).
+### 4. Advanced Boosting & Training Controls
+- **DART Booster (`booster_type = BoosterType::DART`)**: Dropouts meet Multiple Additive Regression Trees with drop rate, skip drop, and weight normalization.
+- **Early Stopping**: `early_stopping_rounds` monitors validation metrics and automatically stops training when progress plateaus.
+- **Training Continuation**: `booster.train_continue(...)` appends additional boosting rounds to an existing model.
 
-5. **Multi-threaded CPU Fallback**:
-   - Automatic or manual fallback (`DeviceType::Cpu`) parallelized via `rayon`.
+### 5. Interpretability & Model Analysis
+- **Feature Importance**: Scores features by `Weight` (split frequency), `Gain` (average or total gain), and `Cover` (Hessian coverage).
+- **Leaf Index Prediction**: `booster.predict_leaf(...)` returns the exact leaf node IDs where samples terminate across all trees.
+- **Tree SHAP (`predict_contributions`)**: Exact implementation of TreeSHAP (Lundberg & Lee) returning feature attributions satisfying additive efficiency:
+  $$\sum_{j=0}^{M-1} \phi_{i, j} + \phi_{\text{bias}} = \hat{y}_i$$
+
+### 6. Interoperability
+- **XGBoost JSON Format**: Direct export and import matching the official XGBoost JSON schema (`to_xgboost_json`, `from_xgboost_json`, `save_model`, `load_model`).
 
 ---
 
@@ -58,67 +81,39 @@ Add `xgboost-webgpu` to your `Cargo.toml`:
 xgboost-webgpu = "0.1.0"
 ```
 
-### Regression Example
+### Multi-Class Classification with Advanced Features
 
 ```rust
-use xgboost_webgpu::{BoosterParams, DeviceType, DMatrix, train};
+use xgboost_webgpu::{BoosterParams, DeviceType, DMatrix, GrowPolicy, ImportanceType, train};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let x_train = vec![
-        1.0, 2.0, 3.0,
-        4.0, 5.0, 6.0,
-        7.0, 8.0, 9.0,
-        10.0, 11.0, 12.0,
-    ];
-    let y_train = vec![1.5, 4.2, 7.1, 10.8];
+    let x = vec![/* features: N x M */];
+    let y = vec![/* labels: 0.0, 1.0, 2.0 */];
 
-    // 1. Build DMatrix
-    let dtrain = DMatrix::from_dense(&x_train, 4, 3, Some(&y_train), 256)?;
+    let dtrain = DMatrix::from_dense(&x, 1000, 6, Some(&y), 256)?;
 
-    // 2. Configure training parameters
     let params = BoosterParams::new()
-        .with_objective("reg:squarederror")
-        .with_max_depth(5)
-        .with_learning_rate(0.2)
+        .with_objective("multi:softprob")
+        .with_num_class(3)
+        .with_grow_policy(GrowPolicy::LossGuide)
+        .with_max_leaves(16)
+        .with_subsample(0.8)
+        .with_colsample_bytree(0.8)
+        .with_early_stopping(5)
         .with_device(DeviceType::WebGPU); // Accelerate on AMD, Apple, Intel, Nvidia
 
-    // 3. Train model
-    let booster = train(params, &dtrain, 20, &[])?;
+    let booster = train(params, &dtrain, 30, &[])?;
 
-    // 4. Predict
-    let predictions = booster.predict(&dtrain)?;
-    println!("Predictions: {:?}", predictions);
+    // Feature Importance
+    let importance = booster.feature_importance(ImportanceType::Gain);
+    println!("Feature Importance: {:?}", importance);
 
-    // 5. Export to standard XGBoost JSON format
+    // TreeSHAP Feature Contributions
+    let shap_values = booster.predict_contributions(&dtrain)?;
+    println!("Sample 0 SHAP values: {:?}", shap_values[0]);
+
+    // Save to official XGBoost JSON
     booster.save_model("model.json")?;
-    println!("Model saved to model.json (compatible with Python xgboost.Booster)");
-
-    Ok(())
-}
-```
-
-### Binary Classification Example
-
-```rust
-use xgboost_webgpu::{BoosterParams, DeviceType, DMatrix, train, metrics};
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let x_data = vec![/* features */];
-    let y_data = vec![0.0, 1.0, 0.0, 1.0];
-
-    let dtrain = DMatrix::from_dense(&x_data, 4, 2, Some(&y_data), 256)?;
-
-    let params = BoosterParams::new()
-        .with_objective("binary:logistic")
-        .with_max_depth(4)
-        .with_learning_rate(0.3)
-        .with_device(DeviceType::WebGPU);
-
-    let booster = train(params, &dtrain, 15, &[])?;
-    let probs = booster.predict(&dtrain)?;
-
-    let logloss = metrics::logloss(&y_data, &probs);
-    println!("Train LogLoss: {:.4}", logloss);
 
     Ok(())
 }
@@ -126,16 +121,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
-## Running Benchmarks and Examples
+## Running Benchmarks & Examples
 
 ```bash
-# Run California Housing regression benchmark on your GPU
+# California Housing regression benchmark
 cargo run --release --example california_housing
 
-# Run non-linear binary classification benchmark on your GPU
+# Non-linear binary classification benchmark
 cargo run --release --example binary_classification
 
-# Run automated test suite (including GPU-vs-CPU histogram validation)
+# Multi-class, LossGuide, Subsampling, and TreeSHAP demonstration
+cargo run --release --example advanced_features
+
+# Automated tests (17 comprehensive tests)
 cargo test
 ```
 
