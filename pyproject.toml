@@ -10,9 +10,42 @@ readme = "README.md"
 authors = [{ name = "Kamonashis Halder", email = "kamonashis.halder@gmail.com" }]
 license = { text = "MIT" }
 requires-python = ">=3.8"
+keywords = [
+    "xgboost",
+    "webgpu",
+    "gpu",
+    "machine-learning",
+    "gradient-boosting",
+    "gbdt",
+    "amd",
+    "apple-silicon",
+    "intel-arc",
+    "vulkan",
+    "metal",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "numpy>=1.20",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Kamonashis/xgboost-webgpu"
+Documentation = "https://github.com/Kamonashis/xgboost-webgpu#readme"
+Repository = "https://github.com/Kamonashis/xgboost-webgpu"
+Issues = "https://github.com/Kamonashis/xgboost-webgpu/issues"
 
 [tool.maturin]
 python-source = "python"
