@@ -123,8 +123,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
----
-
 ## Python Bindings & Scikit-Learn API
 
 `xgboost-webgpu` includes high-performance Python bindings built with PyO3 and the Python Stable ABI (`abi3`). It provides drop-in Scikit-Learn estimators (`XGBRegressor`, `XGBClassifier`) and the core `xgb.train()` functional API with hardware acceleration.
