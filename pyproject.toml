@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "xgboost-webgpu"
+version = "0.1.0"
+description = "Universal WebGPU-accelerated XGBoost for AMD, Apple Silicon, Intel, and NVIDIA GPUs"
+readme = "README.md"
+authors = [{ name = "Kamonashis Halder", email = "kamonashis.halder@gmail.com" }]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+]
+
+[tool.maturin]
+python-source = "python"
+module-name = "xgboost_webgpu._xgboost_webgpu"
+bindings = "pyo3"
+features = ["python", "webgpu"]

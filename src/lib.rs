@@ -25,6 +25,9 @@ pub mod model;
 pub mod objective;
 pub mod tree;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 pub use booster::{Booster, BoosterParams, BoosterType, DeviceType, GrowPolicy, ImportanceType};
 pub use data::{DMatrix, FeatureBinMapper, FeatureType};
 pub use objective::{

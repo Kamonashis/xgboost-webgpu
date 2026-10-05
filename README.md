@@ -121,6 +121,85 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ---
 
+---
+
+## Python Bindings & Scikit-Learn API
+
+`xgboost-webgpu` includes high-performance Python bindings built with PyO3 and the Python Stable ABI (`abi3`). It provides drop-in Scikit-Learn estimators (`XGBRegressor`, `XGBClassifier`) and the core `xgb.train()` functional API with hardware acceleration.
+
+### Installation
+
+```bash
+# Build and install locally using pip
+pip install .
+
+# Or develop with maturin
+maturin develop --release
+```
+
+### Scikit-Learn API Example
+
+```python
+import numpy as np
+import xgboost_webgpu as xgb
+
+# Generate sample data
+X = np.random.randn(1000, 10).astype(np.float32)
+y = (X[:, 0] + X[:, 1] > 0).astype(np.float32)
+
+# Train with WebGPU acceleration
+clf = xgb.XGBClassifier(
+    n_estimators=50,
+    max_depth=4,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    device="webgpu",  # Accelerate on AMD, Apple Silicon, Intel, or NVIDIA
+)
+clf.fit(X, y)
+
+# Predictions & Probabilities
+preds = clf.predict(X)
+probs = clf.predict_proba(X)
+print("Accuracy:", clf.score(X, y))
+
+# Feature Importances & Exact TreeSHAP
+print("Feature Importances:", clf.feature_importances_)
+shap_values = clf.predict_contributions(X)
+print("TreeSHAP shape:", np.array(shap_values).shape)
+
+# Save and load model in XGBoost JSON format
+clf.save_model("model.json")
+```
+
+### Low-Level Functional API
+
+```python
+import xgboost_webgpu as xgb
+
+# Ingest data into quantized DMatrix
+dtrain = xgb.DMatrix(X_train, labels=y_train)
+deval = xgb.DMatrix(X_val, labels=y_val)
+
+# Hyperparameters
+params = {
+    "objective": "multi:softprob",
+    "num_class": 3,
+    "max_depth": 5,
+    "grow_policy": "lossguide",
+    "max_leaves": 31,
+    "early_stopping_rounds": 10,
+    "eval_metric": "error",
+    "device": "webgpu",
+}
+
+# Train Booster
+bst = xgb.train(params, dtrain, num_boost_round=100, evals=[(deval, "val")])
+preds = bst.predict(deval)
+```
+
+---
+
 ## Running Benchmarks & Examples
 
 ```bash
@@ -135,6 +214,9 @@ cargo run --release --example advanced_features
 
 # Automated tests (17 comprehensive tests)
 cargo test
+
+# Python test suite
+python3 -m unittest python/tests/test_python_bindings.py
 ```
 
 ---

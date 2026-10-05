@@ -24,6 +24,17 @@ pub struct Booster {
 }
 
 impl Booster {
+    /// Constructs an empty booster ensemble.
+    pub fn empty() -> Self {
+        Self {
+            params: BoosterParams::new(),
+            trees: Vec::new(),
+            base_score: 0.5,
+            num_features: 0,
+            feature_names: Vec::new(),
+        }
+    }
+
     /// Trains a new Booster model using the provided parameters and training dataset.
     pub fn train(
         params: BoosterParams,
