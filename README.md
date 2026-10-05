@@ -10,6 +10,8 @@ Standard XGBoost only supports GPU acceleration via NVIDIA CUDA (`device='cuda'`
 - **Web Browsers & WebAssembly** (via native WebGPU WGSL)
 - **Multi-threaded CPU Fallback** (via Rayon)
 
+📖 **Documentation & Wiki**: Full architectural guides, mathematical formulations, and API manuals are available on the [Project Wiki](https://tea.ergotresearch.com/Ergot-Research/xgboost-webgpu/wiki) or offline in [`docs/wiki/`](docs/wiki/Home.md).
+
 ---
 
 ## Why WebGPU Instead of WebGL or CUDA?
